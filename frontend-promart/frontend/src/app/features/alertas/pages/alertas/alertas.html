@@ -1,0 +1,271 @@
+<div class="alertas-page">
+
+  <!-- HEADER -->
+  <div class="alertas-header">
+    <div class="header-left">
+      <h1 class="page-title">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+        Alertas de Stock
+      </h1>
+      <p class="page-sub">Productos que requieren reposición inmediata o atención urgente.</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn-marcar-todas"
+              *ngIf="totalNoLeidas() > 0"
+              (click)="marcarTodasLeidasMut.mutate()"
+              [disabled]="marcarTodasLeidasMut.isPending()">
+        <i class="bi bi-check2-all"></i>
+        Marcar todas leídas ({{ totalNoLeidas() }})
+      </button>
+      <button class="btn-refresh" (click)="refrescar()" [disabled]="alertasQuery.isFetching()">
+        <i class="bi" [class.bi-arrow-clockwise]="!alertasQuery.isFetching()"
+           [class.bi-hourglass-split]="alertasQuery.isFetching()"></i>
+        {{ alertasQuery.isFetching() ? 'Actualizando…' : 'Actualizar' }}
+      </button>
+      <span class="ws-badge" *ngIf="wsNuevas() > 0" (click)="refrescar()">
+        <i class="bi bi-lightning-fill"></i> {{ wsNuevas() }} nueva{{ wsNuevas() === 1 ? '' : 's' }}
+      </span>
+    </div>
+  </div>
+
+  <!-- TARJETAS RESUMEN -->
+  <div class="summary-grid">
+    <div class="summary-card card-total" (click)="setFiltro('todos')" [class.active]="filtro() === 'todos'">
+      <div class="sc-icon"><i class="bi bi-bell-fill"></i></div>
+      <div class="sc-body">
+        <span class="sc-num">{{ alertas().length }}</span>
+        <span class="sc-label">Total alertas</span>
+      </div>
+    </div>
+    <div class="summary-card card-critico" (click)="setFiltro('critico')" [class.active]="filtro() === 'critico'">
+      <div class="sc-icon"><i class="bi bi-x-circle-fill"></i></div>
+      <div class="sc-body">
+        <span class="sc-num">{{ totalCritico() }}</span>
+        <span class="sc-label">Stock Crítico</span>
+      </div>
+    </div>
+    <div class="summary-card card-bajo" (click)="setFiltro('minimo')" [class.active]="filtro() === 'minimo'">
+      <div class="sc-icon"><i class="bi bi-arrow-down-circle-fill"></i></div>
+      <div class="sc-body">
+        <span class="sc-num">{{ totalMinimo() }}</span>
+        <span class="sc-label">Stock Mínimo</span>
+      </div>
+    </div>
+    <div class="summary-card card-noLeidas" (click)="setFiltro('no-leidas')" [class.active]="filtro() === 'no-leidas'">
+      <div class="sc-icon"><i class="bi bi-envelope-fill"></i></div>
+      <div class="sc-body">
+        <span class="sc-num">{{ totalNoLeidas() }}</span>
+        <span class="sc-label">No leídas</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOADING -->
+  <div class="state-box" *ngIf="alertasQuery.isLoading()">
+    <div class="spinner"></div>
+    <p>Cargando alertas…</p>
+  </div>
+
+  <!-- ERROR -->
+  <div class="state-box state-error" *ngIf="alertasQuery.isError() && !alertasQuery.isLoading()">
+    <i class="bi bi-wifi-off"></i>
+    <p>No se pudo conectar con el servidor.</p>
+    <button class="btn-refresh" (click)="refrescar()">Reintentar</button>
+  </div>
+
+  <!-- SIN ALERTAS -->
+  <div class="state-box state-ok" *ngIf="!alertasQuery.isLoading() && !alertasQuery.isError() && alertas().length === 0">
+    <i class="bi bi-check-circle-fill"></i>
+    <p>¡Todo bien! No hay alertas de stock activas en este momento.</p>
+  </div>
+
+  <!-- TABLA DE ALERTAS -->
+  <div class="alertas-table-wrap" *ngIf="!alertasQuery.isLoading() && alertas().length > 0">
+
+    <!-- filtro pills -->
+    <div class="filter-bar">
+      <button class="filter-pill" [class.active]="filtro() === 'todos'" (click)="setFiltro('todos')">
+        Todos ({{ alertas().length }})
+      </button>
+      <button class="filter-pill pill-c" [class.active]="filtro() === 'critico'" (click)="setFiltro('critico')" *ngIf="totalCritico() > 0">
+        Stock Crítico ({{ totalCritico() }})
+      </button>
+      <button class="filter-pill pill-b" [class.active]="filtro() === 'minimo'" (click)="setFiltro('minimo')" *ngIf="totalMinimo() > 0">
+        Stock Mínimo ({{ totalMinimo() }})
+      </button>
+      <button class="filter-pill pill-nl" [class.active]="filtro() === 'no-leidas'" (click)="setFiltro('no-leidas')" *ngIf="totalNoLeidas() > 0">
+        <i class="bi bi-circle-fill" style="font-size:.5rem; color:#a855f7"></i>
+        No leídas ({{ totalNoLeidas() }})
+      </button>
+    </div>
+
+    <div class="sin-resultados" *ngIf="filtradas().length === 0">
+      No hay alertas en esta categoría.
+    </div>
+
+    <table class="alertas-table" *ngIf="filtradas().length > 0">
+      <thead>
+        <tr>
+          <th>Producto</th>
+          <th>Categoría</th>
+          <th>Tipo</th>
+          <th>Stock actual</th>
+          <th>Stock mín.</th>
+          <th>Brecha</th>
+          <th>Fecha</th>
+          <th>Registró</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let a of filtradas()"
+            [class]="'row-' + a.severidad"
+            [class.row-leida]="a.leida">
+          <td>
+            <div class="prod-info">
+              <div class="prod-top-row">
+                <span class="leida-dot"
+                      [class.dot-no-leida]="!a.leida"
+                      [class.dot-leida]="a.leida"
+                      [title]="a.leida ? 'Leída' : 'No leída'"></span>
+                <span class="prod-code">{{ a.productoCodigo }}</span>
+              </div>
+              <span class="prod-name">{{ a.productoNombre }}</span>
+            </div>
+          </td>
+          <td><span class="cat-tag">{{ a.productoCategoria }}</span></td>
+          <td>
+            <span class="sev-badge" [class]="'sev-' + a.severidad">
+              <i class="bi"
+                 [class.bi-x-circle-fill]="a.severidad === 'critico'"
+                 [class.bi-arrow-down-circle-fill]="a.severidad === 'minimo'"></i>
+              {{ badgeLabel(a.severidad) }}
+            </span>
+          </td>
+          <td>
+            <div class="stock-cell">
+              <div class="stock-bar-wrap">
+                <div class="stock-bar-fill"
+                  [style.width.%]="a.porcentaje > 100 ? 100 : a.porcentaje"
+                  [style.background]="barColor(a.severidad)">
+                </div>
+              </div>
+              <span class="stock-num" [class]="'stock-' + a.severidad">{{ a.stockActual }}</span>
+            </div>
+          </td>
+          <td class="min-cell">{{ a.stockMinimo }}</td>
+          <td>
+            <span class="brecha-badge">+{{ a.brecha }} uds.</span>
+          </td>
+          <td class="fecha-cell">{{ formatFecha(a.fecha) }}</td>
+          <td class="reg-cell">{{ a.trabajadorNombre ?? '—' }}</td>
+          <td>
+            <div class="actions-cell">
+              <button class="btn-reponer" (click)="abrirReponer(a)" title="Reponer stock">
+                <i class="bi bi-plus-circle"></i> Reponer
+              </button>
+              <button class="btn-leida"
+                      *ngIf="!a.leida"
+                      (click)="marcarLeidaMut.mutate(a.id)"
+                      [disabled]="marcarLeidaMut.isPending()"
+                      title="Marcar como leída">
+                <i class="bi bi-check"></i>
+              </button>
+              <button class="btn-resolver"
+                      (click)="resolverMut.mutate(a.id)"
+                      [disabled]="resolverMut.isPending()"
+                      title="Marcar como resuelta">
+                <i class="bi bi-check2-all"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<!-- MODAL REPONER -->
+<div class="modal-overlay" *ngIf="reponerItem()" (click)="cerrarModal()">
+  <div class="modal-box" (click)="$event.stopPropagation()">
+
+    <div class="modal-header">
+      <div class="modal-title">
+        <i class="bi bi-plus-circle-fill"></i>
+        Registrar reposición
+      </div>
+      <button class="modal-close" (click)="cerrarModal()">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+
+    <div class="modal-body" *ngIf="reponerItem() as item">
+
+      <div class="reponer-product">
+        <div class="rp-sev" [class]="'sev-' + item.severidad">
+          <i class="bi"
+             [class.bi-x-circle-fill]="item.severidad === 'critico'"
+             [class.bi-arrow-down-circle-fill]="item.severidad === 'minimo'"></i>
+          {{ badgeLabel(item.severidad) }}
+        </div>
+        <h3 class="rp-name">{{ item.productoNombre }}</h3>
+        <p class="rp-code">{{ item.productoCodigo }} · {{ item.productoCategoria }}</p>
+      </div>
+
+      <div class="reponer-stats">
+        <div class="rs-item">
+          <span class="rs-label">Stock actual</span>
+          <span class="rs-val rs-current">{{ item.stockActual }}</span>
+        </div>
+        <i class="bi bi-arrow-right rs-arrow"></i>
+        <div class="rs-item">
+          <span class="rs-label">Stock mínimo</span>
+          <span class="rs-val">{{ item.stockMinimo }}</span>
+        </div>
+        <i class="bi bi-arrow-right rs-arrow"></i>
+        <div class="rs-item">
+          <span class="rs-label">Faltan</span>
+          <span class="rs-val rs-brecha">{{ item.brecha }} uds.</span>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Cantidad a ingresar <span class="req">*</span></label>
+        <input type="number" class="form-input" [(ngModel)]="formReponer.cantidad"
+               min="1" placeholder="0">
+        <span class="form-hint">
+          Mínimo sugerido: <strong>{{ item.brecha > 0 ? item.brecha : 1 }}</strong> unidades
+        </span>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Observaciones</label>
+        <textarea class="form-input form-textarea" [(ngModel)]="formReponer.observaciones"
+                  placeholder="Ej: Pedido urgente, proveedor confirmó entrega" rows="3"></textarea>
+      </div>
+
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn-cancel" (click)="cerrarModal()">Cancelar</button>
+      <button class="btn-confirm"
+              (click)="confirmarReponer()"
+              [disabled]="reponerMut.isPending() || formReponer.cantidad < 1">
+        <span *ngIf="!reponerMut.isPending()">
+          <i class="bi bi-check-lg"></i> Confirmar entrada
+        </span>
+        <span *ngIf="reponerMut.isPending()">
+          <i class="bi bi-hourglass-split"></i> Registrando…
+        </span>
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast-alerta" [class.visible]="toastVisible()" [class.toast-ok]="toastOk()" [class.toast-err]="!toastOk()">
+  <i class="bi" [class.bi-check-circle-fill]="toastOk()" [class.bi-x-circle-fill]="!toastOk()"></i>
+  {{ toastMsg() }}
+</div>

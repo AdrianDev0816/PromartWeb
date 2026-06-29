@@ -1,0 +1,296 @@
+<!-- TOAST -->
+<div class="toast-notification"
+     [class.toast-success]="toast().tipo === 'success'"
+     [class.toast-error]="toast().tipo === 'error'"
+     [class.toast-visible]="toast().visible">
+  <i class="bi" [class.bi-check-circle-fill]="toast().tipo === 'success'"
+                [class.bi-x-circle-fill]="toast().tipo === 'error'"></i>
+  <span>{{ toast().mensaje }}</span>
+</div>
+
+<div class="page-wrapper">
+
+  <!-- HEADER -->
+  <div class="page-header">
+    <div>
+      <h2 class="page-title">Movimientos de Inventario</h2>
+      <p class="page-subtitle">Registro de entradas, salidas y ajustes de stock en tiempo real</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn-entrada" (click)="abrirModalEntrada()">
+        <i class="bi bi-plus-lg"></i> Registrar entrada
+      </button>
+      <button class="btn-salida" (click)="abrirModalSalida()">
+        <i class="bi bi-dash-lg"></i> Registrar salida
+      </button>
+    </div>
+  </div>
+
+  <!-- MÉTRICAS -->
+  <div class="metrics-row">
+    <div class="metric-card">
+      <div class="metric-content">
+        <div class="metric-label">ENTRADAS HOY</div>
+        <div class="metric-value value-green">{{ entradasHoy() }}</div>
+        <div class="metric-sub">unidades ingresadas</div>
+      </div>
+      <div class="metric-icon icon-green"><i class="bi bi-box-arrow-in-down"></i></div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-content">
+        <div class="metric-label">SALIDAS HOY</div>
+        <div class="metric-value value-red">{{ salidasHoy() }}</div>
+        <div class="metric-sub">unidades despachadas</div>
+      </div>
+      <div class="metric-icon icon-red"><i class="bi bi-box-arrow-up"></i></div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-content">
+        <div class="metric-label">TOTAL MES</div>
+        <div class="metric-value">{{ totalMes() }}</div>
+        <div class="metric-sub">movimientos registrados</div>
+      </div>
+      <div class="metric-icon icon-slate"><i class="bi bi-arrow-left-right"></i></div>
+    </div>
+  </div>
+
+  <!-- FILTROS -->
+  <div class="filters-card">
+    <div class="filters-row">
+      <div class="filter-group">
+        <label class="filter-label">Desde</label>
+        <input type="date" [ngModel]="filtroDesde()" (ngModelChange)="filtroDesde.set($event)" class="filter-input">
+      </div>
+      <div class="filter-group">
+        <label class="filter-label">Hasta</label>
+        <input type="date" [ngModel]="filtroHasta()" (ngModelChange)="filtroHasta.set($event)" class="filter-input">
+      </div>
+      <div class="filter-group">
+        <label class="filter-label">Tipo</label>
+        <select [ngModel]="filtroTipo()" (ngModelChange)="filtroTipo.set($event); currentPage.set(1)" class="filter-select">
+          <option value="">Todos</option>
+          <option value="Entrada">Entrada</option>
+          <option value="Salida">Salida</option>
+          <option value="Ajuste">Ajuste</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label class="filter-label">Motivo</label>
+        <select [ngModel]="filtroMotivo()" (ngModelChange)="filtroMotivo.set($event)" class="filter-select">
+          <option *ngFor="let m of motivosFiltro" [value]="m.valor">{{ m.label }}</option>
+        </select>
+      </div>
+      <div class="filter-btns">
+        <button class="btn-filtrar" (click)="filtrar()">
+          <i class="bi bi-funnel-fill"></i> FILTRAR
+        </button>
+        <button class="btn-limpiar" (click)="limpiarFiltros()">
+          <i class="bi bi-x-circle"></i> Limpiar
+        </button>
+      </div>
+    </div>
+    <div class="reporte-total" *ngIf="mostrarReporteTotal() && reporteTotal() !== null">
+      <i class="bi bi-cash-stack"></i>
+      <span>{{ reporteEtiqueta() }}:</span>
+      <strong>S/ {{ reporteTotal() | number:'1.2-2' }}</strong>
+    </div>
+  </div>
+
+  <!-- TABLA -->
+  <div class="table-card">
+    <div class="loading-wrapper" *ngIf="movimientosQuery.isLoading()">
+      <div class="spinner"></div>
+      <span>Cargando movimientos...</span>
+    </div>
+
+    <div *ngIf="!movimientosQuery.isLoading()">
+      <div class="table-responsive">
+        <table class="mov-table">
+          <thead>
+            <tr>
+              <th># ID</th>
+              <th>PRODUCTO</th>
+              <th>CATEGORÍA</th>
+              <th>TIPO</th>
+              <th>MOTIVO</th>
+              <th class="text-center">CANTIDAD</th>
+              <th class="text-end">PRECIO UNIT.</th>
+              <th class="text-end">TOTAL</th>
+              <th>FECHA</th>
+              <th>TRABAJADOR</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let mov of movimientosPaginados()" class="data-row">
+              <td class="td-id">#{{ mov.id | number:'3.0-0' }}</td>
+              <td class="td-producto">
+                <div class="product-name">{{ mov.productoNombre }}</div>
+                <div class="product-code">{{ mov.productoCodigoSerie }}</div>
+              </td>
+              <td class="td-secondary">{{ mov.productoCategoria }}</td>
+              <td>
+                <span class="badge-tipo"
+                      [class.badge-entrada]="mov.tipo === 'Entrada'"
+                      [class.badge-salida]="mov.tipo === 'Salida'"
+                      [class.badge-ajuste]="mov.tipo === 'Ajuste'">
+                  {{ mov.tipo }}
+                </span>
+              </td>
+              <td class="td-secondary">{{ displayMotivo(mov.motivo) }}</td>
+              <td class="text-center">
+                <span class="cantidad-value"
+                      [class.cant-entrada]="mov.tipo === 'Entrada'"
+                      [class.cant-salida]="mov.tipo === 'Salida'"
+                      [class.cant-ajuste]="mov.tipo === 'Ajuste'">
+                  {{ prefijoCantidad(mov) }}{{ mov.cantidad }}
+                </span>
+              </td>
+              <td class="text-end td-precio">
+                <span *ngIf="mostrarPrecio(mov)">S/ {{ mov.precioUnitario | number:'1.2-2' }}</span>
+                <span *ngIf="!mostrarPrecio(mov)" class="td-dash">—</span>
+              </td>
+              <td class="text-end td-total">
+                <span *ngIf="mostrarPrecio(mov)">S/ {{ mov.precioTotal | number:'1.2-2' }}</span>
+                <span *ngIf="!mostrarPrecio(mov)" class="td-dash">—</span>
+              </td>
+              <td class="td-fecha">{{ formatFecha(mov.fecha) }}</td>
+              <td class="td-secondary">{{ mov.trabajador || '—' }}</td>
+            </tr>
+            <tr *ngIf="movimientosPaginados().length === 0">
+              <td colspan="10" class="empty-row">
+                <i class="bi bi-inbox"></i>
+                <span>No se encontraron movimientos</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="table-footer">
+        <span class="pagination-info">
+          Mostrando {{ Math.min((currentPage()-1)*itemsPerPage+1, movimientosFiltrados().length) }}–{{ Math.min(currentPage()*itemsPerPage, movimientosFiltrados().length) }}
+          de {{ movimientosFiltrados().length }} movimientos
+        </span>
+        <div class="pagination-controls">
+          <button class="pag-btn" (click)="prevPage()" [disabled]="currentPage() === 1">
+            <i class="bi bi-chevron-left"></i> Anterior
+          </button>
+          <span class="pag-info">{{ currentPage() }} / {{ totalPages() }}</span>
+          <button class="pag-btn" (click)="nextPage()" [disabled]="currentPage() === totalPages()">
+            Siguiente <i class="bi bi-chevron-right"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ENTRADA -->
+<div class="modal-overlay" *ngIf="showModalEntrada()" (click)="cerrarModalEntrada()">
+  <div class="modal-box" (click)="$event.stopPropagation()">
+    <div class="modal-header modal-header-entrada">
+      <div class="modal-header-icon"><i class="bi bi-box-arrow-in-down-fill"></i></div>
+      <div>
+        <h4 class="modal-title">Registrar entrada de stock</h4>
+        <p class="modal-subtitle">Ingreso de productos al inventario</p>
+      </div>
+      <button class="modal-close" (click)="cerrarModalEntrada()"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group form-full">
+          <label class="form-label">Producto *</label>
+          <select [(ngModel)]="formEntrada.productoId" (ngModelChange)="onProductoEntradaChange()" class="form-input">
+            <option [ngValue]="null">Seleccionar producto...</option>
+            <option *ngFor="let p of productosQuery.data()" [value]="p.id">
+              {{ p.codigoSerie }} — {{ p.nombre }}
+            </option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Cantidad *</label>
+          <input type="number" [(ngModel)]="formEntrada.cantidad" min="1" class="form-input">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Motivo *</label>
+          <select [(ngModel)]="formEntrada.motivo" class="form-input">
+            <option *ngFor="let m of motivosEntrada" [value]="m.valor">{{ m.label }}</option>
+          </select>
+        </div>
+        <div class="form-group form-full">
+          <label class="form-label">Observaciones</label>
+          <textarea [(ngModel)]="formEntrada.observaciones" rows="2" placeholder="Opcional..." class="form-input form-textarea"></textarea>
+        </div>
+      </div>
+      <div class="stock-summary stock-summary-info" *ngIf="productoEntrada">
+        <i class="bi bi-info-circle-fill"></i>
+        <span>Stock actual: <strong>{{ productoEntrada.stockActual }}</strong> → Stock nuevo: <strong>{{ stockNuevoEntrada }}</strong></span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" (click)="cerrarModalEntrada()">Cancelar</button>
+      <button class="btn-action-entrada" (click)="registrarEntrada()" [disabled]="entradaMutation.isPending() || !formEntrada.productoId">
+        <i class="bi" [class.bi-arrow-repeat]="entradaMutation.isPending()" [class.spin]="entradaMutation.isPending()"
+                      [class.bi-box-arrow-in-down]="!entradaMutation.isPending()"></i>
+        {{ entradaMutation.isPending() ? 'Registrando...' : 'Registrar entrada' }}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL SALIDA -->
+<div class="modal-overlay" *ngIf="showModalSalida()" (click)="cerrarModalSalida()">
+  <div class="modal-box" (click)="$event.stopPropagation()">
+    <div class="modal-header modal-header-salida">
+      <div class="modal-header-icon"><i class="bi bi-box-arrow-up-fill"></i></div>
+      <div>
+        <h4 class="modal-title">Registrar salida de stock</h4>
+        <p class="modal-subtitle">Despacho o baja de productos del inventario</p>
+      </div>
+      <button class="modal-close" (click)="cerrarModalSalida()"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group form-full">
+          <label class="form-label">Producto *</label>
+          <select [(ngModel)]="formSalida.productoId" (ngModelChange)="onProductoSalidaChange()" class="form-input">
+            <option [ngValue]="null">Seleccionar producto...</option>
+            <option *ngFor="let p of productosQuery.data()" [value]="p.id">
+              {{ p.codigoSerie }} — {{ p.nombre }} (stock: {{ p.stockActual }})
+            </option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Cantidad *</label>
+          <input type="number" [(ngModel)]="formSalida.cantidad" min="1" class="form-input">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Motivo *</label>
+          <select [(ngModel)]="formSalida.motivo" class="form-input">
+            <option *ngFor="let m of motivosSalida" [value]="m.valor">{{ m.label }}</option>
+          </select>
+        </div>
+        <div class="form-group form-full">
+          <label class="form-label">Observaciones</label>
+          <textarea [(ngModel)]="formSalida.observaciones" rows="2" placeholder="Opcional..." class="form-input form-textarea"></textarea>
+        </div>
+      </div>
+      <div class="stock-summary stock-summary-ok" *ngIf="productoSalida && stockSuficiente">
+        <i class="bi bi-check-circle-fill"></i>
+        <span>Stock actual: <strong>{{ productoSalida.stockActual }}</strong> → Stock nuevo: <strong>{{ stockNuevoSalida }}</strong></span>
+      </div>
+      <div class="stock-summary stock-summary-warn" *ngIf="productoSalida && !stockSuficiente">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+        <span><strong>Stock insuficiente.</strong> Stock actual: <strong>{{ productoSalida.stockActual }}</strong>, necesitas: <strong>{{ formSalida.cantidad }}</strong>. El backend rechazará esta operación.</span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" (click)="cerrarModalSalida()">Cancelar</button>
+      <button class="btn-action-salida" (click)="registrarSalida()" [disabled]="salidaMutation.isPending() || !formSalida.productoId">
+        <i class="bi" [class.bi-arrow-repeat]="salidaMutation.isPending()" [class.spin]="salidaMutation.isPending()"
+                      [class.bi-box-arrow-up]="!salidaMutation.isPending()"></i>
+        {{ salidaMutation.isPending() ? 'Registrando...' : 'Registrar salida' }}
+      </button>
+    </div>
+  </div>
+</div>

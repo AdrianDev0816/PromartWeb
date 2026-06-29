@@ -1,0 +1,319 @@
+<div class="page-wrapper">
+
+  <!-- ── Header ─────────────────────────────────────────────────────── -->
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">
+        <i class="bi bi-cart3"></i>
+        Órdenes de Compra
+        <span class="title-badge" *ngIf="esSupervisor && !esAdmin">Evaluación de Supervisor</span>
+        <span class="title-badge-admin" *ngIf="esAdmin">Administrador</span>
+      </h1>
+      <p class="page-subtitle" *ngIf="esSupervisor && !esAdmin">
+        Revisa y evalúa las órdenes generadas antes de su aprobación final
+      </p>
+      <p class="page-subtitle" *ngIf="esAdmin">
+        Gestión completa de órdenes de compra — aprueba, completa o cancela
+      </p>
+    </div>
+  </div>
+
+  <!-- ── Estado de carga ────────────────────────────────────────────── -->
+  <div class="loading-row" *ngIf="query.isLoading()">
+    <span class="spinner"></span> Cargando órdenes…
+  </div>
+  <div class="alert-error" *ngIf="query.isError()">
+    <i class="bi bi-exclamation-triangle-fill"></i>
+    No se pudieron cargar las órdenes. Verifica que el backend esté activo.
+  </div>
+
+  <ng-container *ngIf="query.isSuccess()">
+
+    <!-- ── Métricas ───────────────────────────────────────────────────── -->
+    <div class="metrics-grid">
+
+      <div class="metric-card">
+        <i class="bi bi-cart-check metric-icon text-slate"></i>
+        <div class="metric-label">TOTAL ÓRDENES</div>
+        <div class="metric-value">{{ totalOrdenes() }}</div>
+        <div class="metric-sub">registradas en el sistema</div>
+      </div>
+
+      <div class="metric-card metric-warn">
+        <i class="bi bi-hourglass-split metric-icon"></i>
+        <div class="metric-label">PENDIENTES</div>
+        <div class="metric-value warn">{{ pendientes() }}</div>
+        <div class="metric-sub" *ngIf="pendientes() > 0">
+          <span class="pulse-dot"></span> Requieren evaluación
+        </div>
+        <div class="metric-sub" *ngIf="pendientes() === 0">Sin pendientes</div>
+      </div>
+
+      <div class="metric-card metric-ok">
+        <i class="bi bi-check-circle metric-icon text-green"></i>
+        <div class="metric-label">APROBADAS</div>
+        <div class="metric-value ok">{{ aprobadas() }}</div>
+        <div class="metric-sub">listas para proceso</div>
+      </div>
+
+      <div class="metric-card metric-danger">
+        <i class="bi bi-x-circle metric-icon text-red"></i>
+        <div class="metric-label">RECHAZADAS</div>
+        <div class="metric-value danger">{{ rechazadas() }}</div>
+        <div class="metric-sub">no procedieron</div>
+      </div>
+
+    </div>
+
+    <!-- ── Filtros ─────────────────────────────────────────────────────── -->
+    <div class="filters-bar">
+      <div class="filter-group">
+        <label>Desde</label>
+        <input type="date" [(ngModel)]="filtroDesde" (change)="filtrar()">
+      </div>
+      <div class="filter-group">
+        <label>Hasta</label>
+        <input type="date" [(ngModel)]="filtroHasta" (change)="filtrar()">
+      </div>
+      <div class="filter-group">
+        <label>Estado</label>
+        <select [(ngModel)]="filtroEstado" (change)="filtrar()">
+          <option value="">Todos</option>
+          <option value="Pendiente">Pendiente</option>
+          <option value="Aprobada">Aprobada</option>
+          <option value="Rechazada">Rechazada</option>
+          <option value="EnProceso">En proceso</option>
+          <option value="Completada">Completada</option>
+          <option value="Cancelada">Cancelada</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Proveedor</label>
+        <input type="text" placeholder="Buscar proveedor…"
+               [(ngModel)]="filtroProveedor" (input)="filtrar()">
+      </div>
+      <button class="btn-limpiar" (click)="limpiar()">
+        <i class="bi bi-x-lg"></i> Limpiar
+      </button>
+    </div>
+
+    <!-- ── Tabla ───────────────────────────────────────────────────────── -->
+    <div class="table-card">
+
+      <div class="empty-state" *ngIf="ordenesFiltradas().length === 0">
+        <i class="bi bi-inbox"></i>
+        <p>No hay órdenes con los filtros aplicados</p>
+      </div>
+
+      <div class="table-responsive" *ngIf="ordenesFiltradas().length > 0">
+        <table>
+          <thead>
+            <tr>
+              <th>N° ORDEN</th>
+              <th>PROVEEDOR</th>
+              <th>PRODUCTOS</th>
+              <th>TOTAL</th>
+              <th>SOLICITADO POR</th>
+              <th>FECHA EMISIÓN</th>
+              <th>ESTADO</th>
+              <th>ACCIONES</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let o of ordenesPaginadas()"
+                [class.row-pendiente]="o.estado === 'Pendiente'">
+              <td><strong>{{ o.numeroOrden }}</strong></td>
+              <td>{{ o.proveedorNombre }}</td>
+              <td class="text-center">{{ o.cantidadProductos }} ítems</td>
+              <td><strong>{{ formatMonto(o.total) }}</strong></td>
+              <td>
+                <div>{{ o.trabajadorNombre }}</div>
+                <small class="text-muted">{{ o.trabajadorCargo }}</small>
+              </td>
+              <td>{{ formatFecha(o.fechaEmision) }}</td>
+              <td>
+                <span class="badge-estado" [ngClass]="badgeEstado(o.estado)">
+                  <span class="pulse" *ngIf="o.estado === 'Pendiente'"></span>
+                  {{ etiquetaEstado(o.estado) }}
+                </span>
+              </td>
+              <td>
+                <button class="btn-accion btn-evaluar" *ngIf="puedeEvaluar(o)"
+                        (click)="abrirPanel(o)" title="Evaluar orden">
+                  <i class="bi bi-search"></i>
+                </button>
+                <button class="btn-accion btn-ver" *ngIf="!puedeEvaluar(o)"
+                        (click)="abrirPanel(o)" title="Ver detalle">
+                  <i class="bi bi-eye"></i>
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Paginación -->
+      <div class="pagination" *ngIf="ordenesFiltradas().length > 0">
+        <span class="pag-info">
+          Mostrando {{ desde() }}-{{ hasta() }} de {{ ordenesFiltradas().length }} órdenes
+        </span>
+        <div class="pag-btns">
+          <button (click)="anteriorPagina()" [disabled]="paginaActual() === 1">
+            <i class="bi bi-chevron-left"></i>
+          </button>
+          <span>{{ paginaActual() }} / {{ totalPaginas() }}</span>
+          <button (click)="siguientePagina()" [disabled]="paginaActual() === totalPaginas()">
+            <i class="bi bi-chevron-right"></i>
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+  </ng-container>
+
+</div>
+
+<!-- ── Panel de evaluación / detalle (slide-in) ───────────────────── -->
+<div class="panel-overlay" [class.active]="panelAbierto()" (click)="cerrarPanel()"></div>
+
+<aside class="eval-panel" [class.panel-open]="panelAbierto()">
+  <ng-container *ngIf="ordenSeleccionada() as o">
+
+    <div class="panel-header">
+      <div>
+        <h2>{{ o.numeroOrden }} — {{ o.proveedorNombre }}</h2>
+        <span class="badge-estado" [ngClass]="badgeEstado(o.estado)">
+          <span class="pulse" *ngIf="o.estado === 'Pendiente'"></span>
+          {{ etiquetaEstado(o.estado) }}
+        </span>
+      </div>
+      <button class="btn-cerrar-panel" (click)="cerrarPanel()">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+
+    <!-- Info general -->
+    <div class="panel-section">
+      <div class="info-row">
+        <span class="info-label">Solicitado por</span>
+        <span>{{ o.trabajadorNombre }} <small class="text-muted">({{ o.trabajadorCargo }})</small></span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Fecha emisión</span>
+        <span>{{ formatFecha(o.fechaEmision) }}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Entrega estimada</span>
+        <span>{{ formatFecha(o.fechaEstimadaEntrega) }}</span>
+      </div>
+      <div class="info-row" *ngIf="o.observaciones">
+        <span class="info-label">Observaciones</span>
+        <span class="obs-text">{{ o.observaciones }}</span>
+      </div>
+      <div class="info-row" *ngIf="o.evaluadorNombre">
+        <span class="info-label">Evaluado por</span>
+        <span>{{ o.evaluadorNombre }}</span>
+      </div>
+      <div class="info-row" *ngIf="o.motivoRechazo">
+        <span class="info-label">Motivo rechazo</span>
+        <span class="text-danger">{{ o.motivoRechazo }}</span>
+      </div>
+    </div>
+
+    <!-- Tabla productos -->
+    <div class="panel-section">
+      <h3 class="section-title">Productos solicitados</h3>
+      <table class="panel-table">
+        <thead>
+          <tr>
+            <th>PRODUCTO</th>
+            <th class="text-right">CANT.</th>
+            <th class="text-right">PRECIO</th>
+            <th class="text-right">SUBTOTAL</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let d of o.detalles">
+            <td>
+              <div>{{ d.productoNombre }}</div>
+              <small class="text-muted">{{ d.productoCodigoSerie }}</small>
+            </td>
+            <td class="text-right">{{ d.cantidad }}</td>
+            <td class="text-right">{{ formatMonto(d.precioUnitario) }}</td>
+            <td class="text-right"><strong>{{ formatMonto(d.subtotal) }}</strong></td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="3" class="text-right"><strong>TOTAL</strong></td>
+            <td class="text-right total-monto">{{ formatMonto(o.total) }}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <!-- Sección evaluación -->
+    <div class="panel-section eval-section" *ngIf="puedeEvaluar(o)">
+      <h3 class="section-title">Tu evaluación como Supervisor</h3>
+
+      <div class="error-msg" *ngIf="errorPanel()">
+        <i class="bi bi-exclamation-circle"></i> {{ errorPanel() }}
+      </div>
+
+      <div class="form-group">
+        <label>Comentarios / motivo <small>(obligatorio si rechazas)</small></label>
+        <textarea rows="3" [(ngModel)]="comentario"
+          placeholder="Ej: Cantidad excesiva para temporada actual…"></textarea>
+      </div>
+
+      <div class="eval-btns">
+        <button class="btn-aprobar" (click)="aprobar()" [disabled]="cargando()">
+          <i class="bi bi-check-lg"></i> Aprobar orden
+        </button>
+        <button class="btn-rechazar" (click)="rechazar()" [disabled]="cargando()">
+          <i class="bi bi-x-lg"></i> Rechazar orden
+        </button>
+      </div>
+
+      <div class="eval-nota">
+        <i class="bi bi-info-circle"></i>
+        Al aprobar, la orden pasará a estado <strong>Aprobada</strong> y quedará pendiente
+        de confirmación de llegada por el Administrador.
+      </div>
+    </div>
+
+    <!-- Sección admin (solo cancelar) -->
+    <div class="panel-section eval-section admin-section"
+         *ngIf="esAdmin && puedeCancelar(o)">
+      <h3 class="section-title">Acciones de Administrador</h3>
+
+      <div class="error-msg" *ngIf="errorPanel()">
+        <i class="bi bi-exclamation-circle"></i> {{ errorPanel() }}
+      </div>
+
+      <div class="eval-nota" style="margin-bottom:12px">
+        <i class="bi bi-info-circle"></i>
+        El Almacenero es quien confirma la recepción de los productos y registra
+        las entradas al inventario desde su vista <strong>Mis Órdenes</strong>.
+      </div>
+
+      <div class="eval-btns">
+        <button class="btn-cancelar-orden"
+                (click)="cancelar()" [disabled]="cargando()">
+          <i class="bi bi-trash"></i> Cancelar orden
+        </button>
+      </div>
+    </div>
+
+  </ng-container>
+</aside>
+
+<!-- ── Toast ─────────────────────────────────────────────────────────── -->
+<div class="toast-ord" [class.toast-visible]="toastVisible()"
+     [class.toast-ok]="toastTipo() === 'ok'"
+     [class.toast-err]="toastTipo() === 'err'">
+  <i class="bi" [class.bi-check-circle-fill]="toastTipo() === 'ok'"
+                [class.bi-x-circle-fill]="toastTipo() === 'err'"></i>
+  {{ toastMsg() }}
+</div>

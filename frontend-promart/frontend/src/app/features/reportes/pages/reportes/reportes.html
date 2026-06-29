@@ -1,0 +1,247 @@
+<div class="page-wrapper">
+
+  <!-- HEADER -->
+  <div class="page-header">
+    <div>
+      <h2 class="page-title">Reportes Analíticos</h2>
+      <p class="page-subtitle">Visualización estadística de ventas y rotación de inventario</p>
+    </div>
+    <button class="btn-export-pdf">
+      <i class="bi bi-file-earmark-pdf-fill"></i> Exportar PDF
+    </button>
+  </div>
+
+  <!-- FILTROS -->
+  <div class="filters-card">
+    <div class="filters-row">
+
+      <div class="filter-group">
+        <label class="filter-label">Motivo</label>
+        <select [(ngModel)]="filtros.motivo" class="filter-select">
+          <option value="">Todos los motivos</option>
+          <option value="Venta">Ventas</option>
+          <option value="Entrada">Entradas</option>
+          <option value="Merma">Mermas</option>
+          <option value="Devolucion">Devoluciones</option>
+          <option value="Ajuste">Ajustes</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label class="filter-label">Desde</label>
+        <input type="date" [(ngModel)]="filtros.desde" class="filter-input">
+      </div>
+
+      <div class="filter-group">
+        <label class="filter-label">Hasta</label>
+        <input type="date" [(ngModel)]="filtros.hasta" class="filter-input">
+      </div>
+
+      <div class="filter-btn-group">
+        <button class="btn-generar" (click)="generarReporte()" [disabled]="cargando()">
+          <i class="bi" [class.bi-bar-chart-fill]="!cargando()" [class.bi-arrow-repeat]="cargando()"></i>
+          {{ cargando() ? 'CARGANDO...' : 'GENERAR REPORTE' }}
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ERROR -->
+  <div class="alert-error" *ngIf="errorMsg()">
+    <i class="bi bi-exclamation-triangle"></i> {{ errorMsg() }}
+  </div>
+
+  <!-- CARDS RESUMEN -->
+  <div class="summary-row">
+
+    <div class="summary-card">
+      <div class="summary-content">
+        <div class="summary-label">TOTAL MOVIMIENTOS</div>
+        <div class="summary-value">{{ cargando() ? '—' : movimientos().length }}</div>
+        <div class="summary-sub">{{ rangoLabel() || 'Operaciones registradas' }}</div>
+      </div>
+      <div class="summary-icon icon-slate">
+        <i class="bi bi-gear-fill"></i>
+      </div>
+    </div>
+
+    <div class="summary-card">
+      <div class="summary-content">
+        <div class="summary-label">{{ mostrarTotal() ? etiquetaTotal().toUpperCase() : 'TOTAL GENERAL' }}</div>
+        <div class="summary-value value-green">
+          {{ cargando() ? '—' : ('S/ ' + (totalMonto() | number:'1.2-2')) }}
+        </div>
+        <div class="summary-sub">Rango de fechas seleccionado</div>
+      </div>
+      <div class="summary-icon icon-green">
+        <i class="bi bi-currency-dollar"></i>
+      </div>
+    </div>
+
+    <div class="summary-card">
+      <div class="summary-content">
+        <div class="summary-label">PRODUCTOS DISTINTOS</div>
+        <div class="summary-value">{{ cargando() ? '—' : productosDistintos() }}</div>
+        <div class="summary-sub">Con movimientos en el período</div>
+      </div>
+      <div class="summary-icon icon-slate">
+        <i class="bi bi-box-fill"></i>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- GRÁFICOS -->
+  <div class="charts-row">
+
+    <!-- Líneas -->
+    <div class="chart-card">
+      <div class="chart-card-header">
+        <div>
+          <h3 class="chart-title">MOVIMIENTOS POR CATEGORÍA</h3>
+          <p class="chart-subtitle">Entradas y salidas del mes por categoría</p>
+        </div>
+      </div>
+
+      <div class="pills-row">
+        <button *ngFor="let cat of categorias; let i = index"
+                class="pill"
+                [style.background]="pillBg(cat)"
+                [style.borderColor]="pillBorder(cat)"
+                [style.color]="pillColor(cat)"
+                (click)="toggleCategoria(cat)">
+          <span class="pill-dot" [style.background]="cat.color"></span>
+          {{ cat.nombre }}
+        </button>
+      </div>
+
+      <div echarts [options]="lineChartOption" class="chart-echarts"></div>
+    </div>
+
+    <!-- Dona -->
+    <div class="chart-card">
+      <div class="chart-card-header">
+        <div>
+          <h3 class="chart-title">DISTRIBUCIÓN POR MOTIVO</h3>
+          <p class="chart-subtitle">Catalogación por tipo de movimiento</p>
+        </div>
+      </div>
+
+      <div class="donut-body">
+
+        <div class="donut-chart-wrap">
+          <div echarts
+               [options]="donutOption"
+               class="chart-echarts"
+               (chartMouseover)="onDonutHover($event)"
+               (chartMouseout)="onDonutMouseout()">
+          </div>
+          <div class="donut-center-label">
+            <span class="donut-main">{{ donutCentro.linea1 }}</span>
+            <span class="donut-sub">{{ donutCentro.linea2 }}</span>
+          </div>
+        </div>
+
+        <div class="donut-legend">
+          <div *ngFor="let item of donutData" class="legend-row">
+            <span class="legend-dot" [style.background]="item.color"></span>
+            <span class="legend-name">{{ item.name }}</span>
+            <span class="legend-pct">{{ item.value }}%</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <!-- TABLA -->
+  <div class="table-card">
+
+    <div class="table-card-header">
+      <div>
+        <h3 class="chart-title">DETALLE DE MOVIMIENTOS</h3>
+        <p class="chart-subtitle">{{ rangoLabel() || 'Consolidado general analítico' }}</p>
+      </div>
+      <button class="btn-export-excel" (click)="exportarExcel()"
+              [disabled]="movimientos().length === 0"
+              title="Descargar movimientos en CSV (abrir con Excel)">
+        <i class="bi bi-file-earmark-excel-fill"></i> EXPORTAR EXCEL
+      </button>
+    </div>
+
+    <!-- Loading -->
+    <div class="loading-wrapper" *ngIf="cargando()">
+      <div class="spinner"></div>
+      <span>Generando reporte...</span>
+    </div>
+
+    <!-- Sin datos -->
+    <div class="empty-report" *ngIf="!cargando() && movimientos().length === 0 && reporte() !== null">
+      <i class="bi bi-inbox"></i>
+      <span>No hay movimientos para el período y filtros seleccionados.</span>
+    </div>
+
+    <div class="table-responsive" *ngIf="!cargando() && movimientos().length > 0">
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th>FECHA</th>
+            <th>PRODUCTO</th>
+            <th>CATEGORÍA</th>
+            <th>MOTIVO</th>
+            <th class="text-center">CANTIDAD</th>
+            <th class="text-end">PRECIO UNIT.</th>
+            <th class="text-end">TOTAL</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let mov of movimientosPaginados()" class="data-row">
+            <td class="td-fecha">{{ formatearFecha(mov.fecha) }}</td>
+            <td class="td-producto">{{ mov.productoNombre }}</td>
+            <td class="td-secondary">{{ mov.productoCategoria }}</td>
+            <td>
+              <span class="badge-motivo" [ngClass]="badgeClass(mov.motivo)">
+                {{ badgeLabel(mov.motivo, mov.tipo) }}
+              </span>
+            </td>
+            <td class="text-center td-cantidad"
+                [class.cantidad-negativa]="cantidadMostrar(mov) < 0"
+                [class.cantidad-positiva]="cantidadMostrar(mov) > 0">
+              {{ cantidadMostrar(mov) > 0 ? '+' : '' }}{{ cantidadMostrar(mov) }} uds
+            </td>
+            <td class="text-end td-precio">S/ {{ mov.precioUnitario | number:'1.2-2' }}</td>
+            <td class="text-end td-total">S/ {{ mov.precioTotal | number:'1.2-2' }}</td>
+          </tr>
+
+          <!-- Fila total -->
+          <tr class="total-row" *ngIf="mostrarTotal()">
+            <td colspan="3" class="total-label">{{ etiquetaTotal().toUpperCase() }}</td>
+            <td></td>
+            <td class="text-center total-mov">{{ movimientos().length }} movimientos</td>
+            <td></td>
+            <td class="text-end total-amount">S/ {{ totalMonto() | number:'1.2-2' }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="table-footer" *ngIf="!cargando() && movimientos().length > 0">
+      <span class="pagination-info">
+        Mostrando {{ paginacionDesde() }}–{{ paginacionHasta() }} de {{ movimientos().length }} movimientos
+      </span>
+      <div class="pagination-controls">
+        <button class="pag-btn" (click)="prevPage()" [disabled]="currentPage() === 1">
+          <i class="bi bi-chevron-left"></i> Anterior
+        </button>
+        <span class="pag-info">{{ currentPage() }} / {{ totalPages() }}</span>
+        <button class="pag-btn" (click)="nextPage()" [disabled]="currentPage() === totalPages()">
+          Siguiente <i class="bi bi-chevron-right"></i>
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+</div>

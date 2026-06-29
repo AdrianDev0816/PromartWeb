@@ -1,0 +1,234 @@
+<!-- TOAST -->
+<div class="toast-notification"
+     [class.toast-success]="toast().tipo === 'success'"
+     [class.toast-error]="toast().tipo === 'error'"
+     [class.toast-visible]="toast().visible">
+  <i class="bi" [class.bi-check-circle-fill]="toast().tipo === 'success'"
+                [class.bi-x-circle-fill]="toast().tipo === 'error'"></i>
+  <span>{{ toast().mensaje }}</span>
+</div>
+
+<div class="page-wrapper">
+
+  <!-- HEADER -->
+  <div class="page-header">
+    <div>
+      <h2 class="page-title">
+        <i class="bi bi-people-fill title-icon"></i> Personal y Trabajadores
+      </h2>
+      <p class="page-subtitle">Gestión de credenciales de accesos, roles de almacén y estados operativos en Perú.</p>
+    </div>
+    <button class="btn-nuevo" (click)="abrirModalNuevo()">
+      <i class="bi bi-person-plus-fill"></i> NUEVO TRABAJADOR
+    </button>
+  </div>
+
+  <!-- MÉTRICAS -->
+  <div class="metrics-row">
+    <div class="metric-card">
+      <div class="metric-info">
+        <div class="metric-label">TOTAL TRABAJADORES</div>
+        <div class="metric-value">{{ trabajadoresQuery.data()?.length ?? 0 }}</div>
+        <div class="metric-sub">Colaboradores registrados</div>
+      </div>
+      <div class="metric-icon"><i class="bi bi-people"></i></div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-info">
+        <div class="metric-label">ACTIVOS</div>
+        <div class="metric-value value-green">{{ totalActivos() }}</div>
+        <div class="metric-sub">Operando actualmente</div>
+      </div>
+      <div class="metric-icon icon-green"><i class="bi bi-person-check"></i></div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-info">
+        <div class="metric-label">ROLES</div>
+        <div class="metric-value value-blue">{{ rolesUnicos() }}</div>
+        <div class="metric-sub">Niveles de autorización</div>
+      </div>
+      <div class="metric-icon icon-blue"><i class="bi bi-briefcase"></i></div>
+    </div>
+  </div>
+
+  <!-- FILTROS -->
+  <div class="filters-card">
+    <div class="filters-row">
+      <div class="search-group">
+        <label class="filter-label">Buscar Trabajador</label>
+        <div class="search-input-wrap">
+          <i class="bi bi-search search-ico"></i>
+          <input type="text" class="filter-input search-big"
+                 [ngModel]="searchTerm()"
+                 (ngModelChange)="searchTerm.set($event); currentPage.set(1)"
+                 placeholder="Buscar por nombre, usuario, email...">
+        </div>
+      </div>
+      <div class="filter-group">
+        <label class="filter-label">Rol Autorizado</label>
+        <select class="filter-select"
+                [ngModel]="filtroRol()"
+                (ngModelChange)="filtroRol.set($event); currentPage.set(1)">
+          <option value="">Todos los roles</option>
+          <option *ngFor="let c of cargos" [value]="c">{{ c }}</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label class="filter-label">Estado del Acceso</label>
+        <select class="filter-select"
+                [ngModel]="filtroEstado()"
+                (ngModelChange)="filtroEstado.set($event); currentPage.set(1)">
+          <option value="">Todos</option>
+          <option value="Activo">Activo</option>
+          <option value="Inactivo">Inactivo</option>
+        </select>
+      </div>
+      <div class="filter-btn-wrap">
+        <button class="btn-filtrar" (click)="currentPage.set(1)">
+          <i class="bi bi-funnel-fill"></i> FILTRAR
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TABLA -->
+  <div class="table-card">
+
+    <div class="loading-wrapper" *ngIf="trabajadoresQuery.isLoading()">
+      <div class="spinner"></div><span>Cargando trabajadores...</span>
+    </div>
+
+    <div *ngIf="!trabajadoresQuery.isLoading()">
+      <div class="table-responsive">
+        <table class="trab-table">
+          <thead>
+            <tr>
+              <th>AVATAR / INICIALES</th>
+              <th>NOMBRE COMPLETO</th>
+              <th>USUARIO ID</th>
+              <th>ROL DEL SISTEMA</th>
+              <th>EMAIL CORPORATIVO</th>
+              <th>ESTADO</th>
+              <th class="text-center">ACCIONES</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let t of trabajadoresPaginados()" class="data-row">
+              <td>
+                <div class="avatar" [style.background]="getAvatarColor(t.iniciales)">
+                  {{ t.iniciales }}
+                </div>
+              </td>
+              <td class="td-nombre">{{ t.nombre }}</td>
+              <td class="td-usuario">@{{ t.usuario }}</td>
+              <td>
+                <span class="badge-cargo"
+                      [class.cargo-admin]="t.cargo === 'Administrador'"
+                      [class.cargo-supervisor]="t.cargo === 'Supervisor'"
+                      [class.cargo-almacenero]="t.cargo === 'Almacenero'"
+                      [class.cargo-cajero]="t.cargo === 'Cajero'">
+                  {{ t.cargo.toUpperCase() }}
+                </span>
+              </td>
+              <td class="td-email">{{ t.email }}</td>
+              <td>
+                <span class="badge-estado"
+                      [class.estado-activo]="t.estado === 'Activo'"
+                      [class.estado-inactivo]="t.estado === 'Inactivo'">
+                  {{ t.estado.toUpperCase() }}
+                </span>
+              </td>
+              <td class="text-center">
+                <div class="actions-group">
+                  <button class="action-btn" title="Editar" (click)="abrirModalEditar(t)">
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  <button class="action-btn action-btn-toggle"
+                          [title]="t.estado === 'Activo' ? 'Desactivar' : 'Activar'"
+                          (click)="toggleEstado(t)">
+                    <i class="bi bi-power"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+            <tr *ngIf="trabajadoresPaginados().length === 0">
+              <td colspan="7" class="empty-row">
+                <i class="bi bi-people"></i>
+                <span>No se encontraron trabajadores</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="table-footer">
+        <span class="pagination-info">
+          Mostrando {{ Math.min((currentPage()-1)*itemsPerPage+1, trabajadoresFiltrados().length) }}-{{ Math.min(currentPage()*itemsPerPage, trabajadoresFiltrados().length) }}
+          de {{ trabajadoresFiltrados().length }} trabajadores registrados
+        </span>
+        <div class="pagination-controls">
+          <button class="pag-btn pag-text" (click)="prevPage()" [disabled]="currentPage() === 1">
+            Anterior
+          </button>
+          <span class="pag-num">{{ currentPage() }}</span>
+          <button class="pag-btn pag-text" (click)="nextPage()" [disabled]="currentPage() === totalPages()">
+            Siguiente
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" *ngIf="showModal()" (click)="cerrarModal()">
+  <div class="modal-box" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-header-icon"><i class="bi bi-person-fill"></i></div>
+      <div>
+        <h4 class="modal-title">{{ editando() ? 'Editar trabajador' : 'Nuevo trabajador' }}</h4>
+        <p class="modal-subtitle">{{ editando() ? 'Modifica los datos del colaborador' : 'Registra un nuevo colaborador' }}</p>
+      </div>
+      <button class="modal-close" (click)="cerrarModal()"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group form-full">
+          <label class="form-label">Nombre completo *</label>
+          <input type="text" [(ngModel)]="form.nombre" placeholder="Ej: Juan Ramos" class="form-input">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Cargo *</label>
+          <select [(ngModel)]="form.cargo" class="form-input">
+            <option *ngFor="let c of cargos" [value]="c">{{ c }}</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Estado</label>
+          <select [(ngModel)]="form.estado" class="form-input">
+            <option value="Activo">Activo</option>
+            <option value="Inactivo">Inactivo</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Usuario *</label>
+          <input type="text" [(ngModel)]="form.usuario" placeholder="Ej: jramos" class="form-input">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Contraseña {{ editando() ? '(dejar vacío para no cambiar)' : '*' }}</label>
+          <input type="password" [(ngModel)]="form.clave" placeholder="••••••••" class="form-input">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" (click)="cerrarModal()">Cancelar</button>
+      <button class="btn-guardar" (click)="guardar()" [disabled]="guardarMutation.isPending()">
+        <i class="bi" [class.bi-arrow-repeat]="guardarMutation.isPending()"
+                      [class.spin]="guardarMutation.isPending()"
+                      [class.bi-check-lg]="!guardarMutation.isPending()"></i>
+        {{ guardarMutation.isPending() ? 'Guardando...' : (editando() ? 'Guardar cambios' : 'Registrar') }}
+      </button>
+    </div>
+  </div>
+</div>

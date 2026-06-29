@@ -1,0 +1,258 @@
+<div class="page-wrapper">
+
+  <!-- HEADER -->
+  <div class="page-header">
+    <div>
+      <h2 class="page-title">
+        Dashboard
+        <span class="title-badge-header">Vista General</span>
+      </h2>
+      <p class="page-subtitle">Resumen en tiempo real del stock de PROMART Perú</p>
+    </div>
+    <a routerLink="/productos" class="btn-nuevo">
+      <i class="bi bi-plus-lg"></i> Nuevo producto
+    </a>
+  </div>
+
+  <!-- FILA 1 — MÉTRICAS -->
+  <div class="metrics-grid">
+
+    <!-- Total productos -->
+    <div class="metric-card card-products">
+      <div class="metric-bg-icon"><i class="bi bi-box-seam"></i></div>
+      <div class="metric-body">
+        <div class="metric-label">TOTAL PRODUCTOS</div>
+        <div class="metric-number">
+          <span *ngIf="productosQuery.isLoading()" class="skeleton-num"></span>
+          <span *ngIf="!productosQuery.isLoading()">{{ totalProductos() }}</span>
+        </div>
+        <div class="metric-badge badge-green">
+          <i class="bi bi-arrow-up-right"></i> Catálogo activo
+        </div>
+        <div class="metric-sub">Modelos registrados en catálogo</div>
+      </div>
+    </div>
+
+    <!-- Bajo stock -->
+    <div class="metric-card card-stock">
+      <div class="metric-bg-icon text-red"><i class="bi bi-exclamation-triangle"></i></div>
+      <div class="metric-body">
+        <div class="metric-label">BAJO STOCK</div>
+        <div class="metric-number text-red">
+          <span *ngIf="bajoStockQuery.isLoading()" class="skeleton-num"></span>
+          <span *ngIf="!bajoStockQuery.isLoading()" class="pulse-red">{{ bajoStockCount() }}</span>
+        </div>
+        <div class="metric-badge badge-red">Crítico</div>
+        <div class="metric-sub">Requiere pedido inmediato</div>
+      </div>
+    </div>
+
+    <!-- Movimientos hoy -->
+    <div class="metric-card card-movements">
+      <div class="metric-bg-icon"><i class="bi bi-graph-up-arrow"></i></div>
+      <div class="metric-body">
+        <div class="metric-label">MOVIMIENTOS HOY</div>
+        <div class="metric-number">
+          <span *ngIf="movimientosQuery.isLoading()" class="skeleton-num"></span>
+          <span *ngIf="!movimientosQuery.isLoading()">{{ movimientosHoy() }}</span>
+        </div>
+        <div class="metric-badge badge-slate">
+          Ent: {{ entradasHoy() }} | Sal: {{ salidasHoy() }}
+        </div>
+        <div class="metric-sub">Entradas y salidas hoy</div>
+      </div>
+    </div>
+
+    <!-- Proveedores -->
+    <div class="metric-card card-providers">
+      <div class="metric-bg-icon"><i class="bi bi-truck"></i></div>
+      <div class="metric-body">
+        <div class="metric-label">PROVEEDORES</div>
+        <div class="metric-number">
+          <span *ngIf="productosQuery.isLoading()" class="skeleton-num"></span>
+          <span *ngIf="!productosQuery.isLoading()">{{ proveedoresUnicos() }}</span>
+        </div>
+        <div class="metric-badge badge-teal">Socios logísticos</div>
+        <div class="metric-sub">Proveedores registrados</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- FILA 2 — GRÁFICO + ALERTAS -->
+  <div class="row-two">
+
+    <!-- Gráfico barras -->
+    <div class="chart-card">
+      <div class="chart-header">
+        <div>
+          <h3 class="chart-title">MOVIMIENTOS POR MES</h3>
+          <p class="chart-subtitle">Historial últimos 6 meses</p>
+        </div>
+        <div class="chart-legend">
+          <span class="legend-item"><span class="legend-dot dot-green"></span>Entradas</span>
+          <span class="legend-item"><span class="legend-dot dot-red"></span>Salidas</span>
+        </div>
+      </div>
+
+      <div *ngIf="movimientosQuery.isLoading()" class="chart-loading">
+        <div class="spinner-sm"></div><span>Cargando datos...</span>
+      </div>
+
+      <div echarts *ngIf="!movimientosQuery.isLoading()"
+           [options]="barChartOption()"
+           class="bar-chart">
+      </div>
+
+      <div class="chart-hint">
+        <i class="bi bi-info-circle"></i>
+        Pasa el cursor por las barras para ver cantidades exactas
+      </div>
+    </div>
+
+    <!-- Alertas bajo stock -->
+    <div class="alert-card">
+      <div class="alert-header">
+        <div class="alert-title-row">
+          <h3 class="chart-title">ALERTAS DE STOCK CRÍTICO</h3>
+          <span class="pulse-dot"></span>
+        </div>
+        <p class="chart-subtitle">Productos que requieren reposición</p>
+      </div>
+
+      <div *ngIf="bajoStockQuery.isLoading()" class="chart-loading">
+        <div class="spinner-sm"></div><span>Cargando...</span>
+      </div>
+
+      <div class="alert-list" *ngIf="!bajoStockQuery.isLoading()">
+
+        <div *ngIf="alertasBajoStock().length === 0" class="alert-empty">
+          <i class="bi bi-check-circle-fill text-green"></i>
+          <span>Sin alertas de stock crítico</span>
+        </div>
+
+        <div *ngFor="let p of alertasBajoStock()" class="alert-item">
+          <div class="alert-item-top">
+            <span class="alert-product-name">{{ p.nombre }}</span>
+            <span class="alert-stock-badge">
+              Stock: {{ p.stockActual }} / Mín: {{ p.stockMinimo }}
+            </span>
+          </div>
+          <div class="progress-bar-wrap">
+            <div class="progress-bar-track">
+              <div class="progress-bar-fill" [style.width.%]="stockPct(p)">
+                <span class="progress-pulse"></span>
+              </div>
+            </div>
+          </div>
+          <div class="alert-item-bottom">
+            <span class="alert-category">{{ p.categoria }}</span>
+            <span class="alert-label-red"><i class="bi bi-exclamation-circle-fill"></i> Bajo Stock</span>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="alert-footer">
+        <span class="alert-footer-label">Sugerencia del sistema:</span>
+        <a routerLink="/movimientos" class="alert-footer-link">
+          Generar orden de compra rápido <i class="bi bi-arrow-right"></i>
+        </a>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- FILA 3 — TABLA ÚLTIMOS MOVIMIENTOS -->
+  <div class="table-card">
+
+    <div class="table-card-header">
+      <div class="table-card-title-row">
+        <span class="table-icon-green"><i class="bi bi-arrow-left-right"></i></span>
+        <div>
+          <h3 class="chart-title">Últimos movimientos</h3>
+          <p class="chart-subtitle">Historial reciente</p>
+        </div>
+      </div>
+      <div class="search-box">
+        <i class="bi bi-search search-icon-sm"></i>
+        <input type="text"
+               [ngModel]="searchTerm()"
+               (ngModelChange)="searchTerm.set($event); currentPage.set(1)"
+               placeholder="Buscar movimiento o categoría..."
+               class="search-input">
+      </div>
+    </div>
+
+    <div *ngIf="movimientosQuery.isLoading()" class="loading-wrapper">
+      <div class="spinner-sm"></div><span>Cargando movimientos...</span>
+    </div>
+
+    <div *ngIf="!movimientosQuery.isLoading()">
+      <div class="table-responsive">
+        <table class="mov-table">
+          <thead>
+            <tr>
+              <th>PRODUCTO</th>
+              <th>CATEGORÍA</th>
+              <th>TIPO</th>
+              <th class="text-center">CANTIDAD</th>
+              <th>FECHA</th>
+              <th class="text-center">ESTADO</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let m of movimientosPaginados()" class="data-row">
+              <td class="td-product">{{ m.productoNombre }}</td>
+              <td class="td-secondary">{{ m.productoCategoria }}</td>
+              <td>
+                <span class="badge-tipo"
+                      [class.badge-entrada]="m.tipo === 'Entrada'"
+                      [class.badge-salida]="m.tipo === 'Salida'"
+                      [class.badge-ajuste]="m.tipo === 'Ajuste'">
+                  {{ m.tipo }}
+                </span>
+              </td>
+              <td class="text-center">
+                <span [class.cant-entrada]="m.tipo === 'Entrada'"
+                      [class.cant-salida]="m.tipo === 'Salida'"
+                      [class.cant-ajuste]="m.tipo === 'Ajuste'"
+                      class="cant-val">
+                  {{ prefijoCantidad(m) }}{{ m.cantidad }}
+                </span>
+              </td>
+              <td class="td-fecha">{{ formatFecha(m.fecha) }}</td>
+              <td class="text-center">
+                <span class="badge-completado">Completado</span>
+              </td>
+            </tr>
+            <tr *ngIf="movimientosPaginados().length === 0">
+              <td colspan="6" class="empty-row">
+                <i class="bi bi-inbox"></i>
+                <span>No se encontraron movimientos</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="table-footer">
+        <span class="pagination-info">
+          Mostrando {{ Math.min((currentPage()-1)*itemsPerPage+1, movimientosFiltrados().length) }}–{{ Math.min(currentPage()*itemsPerPage, movimientosFiltrados().length) }}
+          de {{ movimientosFiltrados().length }} movimientos
+        </span>
+        <div class="pagination-controls">
+          <button class="pag-btn" (click)="prevPage()" [disabled]="currentPage() === 1">
+            <i class="bi bi-chevron-left"></i>
+          </button>
+          <span class="pag-info">{{ currentPage() }} de {{ totalPages() }}</span>
+          <button class="pag-btn" (click)="nextPage()" [disabled]="currentPage() === totalPages()">
+            <i class="bi bi-chevron-right"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>

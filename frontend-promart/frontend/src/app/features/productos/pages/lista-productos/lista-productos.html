@@ -1,0 +1,206 @@
+<!-- TOAST -->
+<div class="toast-notification"
+     [class.toast-success]="toast().tipo === 'success'"
+     [class.toast-error]="toast().tipo === 'error'"
+     [class.toast-visible]="toast().visible">
+  <i class="bi" [class.bi-check-circle-fill]="toast().tipo === 'success'"
+                [class.bi-x-circle-fill]="toast().tipo === 'error'"></i>
+  <span>{{ toast().mensaje }}</span>
+</div>
+
+<div class="page-wrapper">
+
+  <!-- HEADER -->
+  <div class="page-header">
+    <div>
+      <h2 class="page-title">
+        Productos
+        <span class="title-badge">{{ productosFiltrados().length }} registros</span>
+      </h2>
+      <p class="page-subtitle">Gestión del catálogo de productos PROMART Perú.</p>
+    </div>
+    <button class="btn-promart btn btn-sm" (click)="abrirModalNuevo()">
+      <i class="bi bi-plus-lg"></i> Nuevo producto
+    </button>
+  </div>
+
+  <!-- ERROR -->
+  <div class="alert-error" *ngIf="productosQuery.isError()">
+    <i class="bi bi-exclamation-triangle"></i> Error al cargar productos. Verifica que el backend esté activo.
+  </div>
+
+  <!-- FILTROS -->
+  <div class="filters-card">
+    <div class="filters-grid">
+      <div class="search-wrapper">
+        <i class="bi bi-search search-icon"></i>
+        <input type="text"
+               [ngModel]="searchTerm()"
+               (ngModelChange)="searchTerm.set($event); currentPage.set(1)"
+               placeholder="Buscar por nombre o código..." class="filter-input">
+      </div>
+      <select [ngModel]="categoriaFiltro()"
+              (ngModelChange)="categoriaFiltro.set($event); currentPage.set(1)"
+              class="filter-select">
+        <option value="">Todas las categorías</option>
+        <option *ngFor="let cat of categorias" [value]="cat">{{cat}}</option>
+      </select>
+      <select [ngModel]="estadoFiltro()"
+              (ngModelChange)="estadoFiltro.set($event); currentPage.set(1)"
+              class="filter-select">
+        <option value="">Todos los estados</option>
+        <option value="Activo">Activo</option>
+        <option value="Inactivo">Inactivo</option>
+      </select>
+      <button class="btn-outline-sm" (click)="limpiarFiltros()">
+        <i class="bi bi-x-circle"></i> Limpiar
+      </button>
+    </div>
+  </div>
+
+  <!-- TABLA -->
+  <div class="dash-card">
+
+    <!-- Loading -->
+    <div class="loading-wrapper" *ngIf="productosQuery.isLoading()">
+      <div class="spinner"></div>
+      <span>Cargando productos...</span>
+    </div>
+
+    <div class="table-responsive" *ngIf="!productosQuery.isLoading()">
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr class="table-head-row">
+            <th>Código</th>
+            <th>Nombre</th>
+            <th>Categoría</th>
+            <th class="text-center">Stock</th>
+            <th class="text-center">Mínimo</th>
+            <th class="text-end">Precio</th>
+            <th class="text-center">Estado</th>
+            <th class="text-center">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let p of productosPaginados()" [class.row-low-stock]="esBajoStock(p)">
+            <td class="td-code">{{ p.codigoSerie }}</td>
+            <td class="td-product">{{ p.nombre }}</td>
+            <td class="td-secondary">{{ p.categoria }}</td>
+            <td class="text-center">
+              <span class="stock-value" [class.stock-critical]="esBajoStock(p)">{{ p.stockActual }}</span>
+            </td>
+            <td class="text-center td-secondary">{{ p.stockMinimo }}</td>
+            <td class="text-end td-price">S/ {{ p.precio | number:'1.2-2' }}</td>
+            <td class="text-center">
+              <span class="estado-badge"
+                    [class.estado-activo]="p.estado === 'Activo'"
+                    [class.estado-inactivo]="p.estado === 'Inactivo'">
+                {{ p.estado }}
+              </span>
+            </td>
+            <td class="text-center">
+              <div class="actions-group">
+                <button class="action-btn" title="Editar" (click)="abrirModalEditar(p)">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <button class="action-btn"
+                        [title]="p.estado === 'Activo' ? 'Desactivar' : 'Activar'"
+                        (click)="toggleEstado(p)">
+                  <i class="bi" [class.bi-toggle-on]="p.estado === 'Activo'"
+                                [class.bi-toggle-off]="p.estado === 'Inactivo'"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+          <tr *ngIf="productosPaginados().length === 0">
+            <td colspan="8" class="empty-row">
+              <i class="bi bi-inbox"></i>
+              <span>No se encontraron productos</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Paginación -->
+    <div class="table-pagination" *ngIf="!productosQuery.isLoading()">
+      <span class="pagination-info">
+        Mostrando {{ Math.min((currentPage()-1)*itemsPerPage+1, productosFiltrados().length) }}–{{ Math.min(productosFiltrados().length, currentPage()*itemsPerPage) }}
+        de {{ productosFiltrados().length }} productos
+      </span>
+      <div class="pagination-controls">
+        <button class="pag-btn" (click)="prevPage()" [disabled]="currentPage() === 1">
+          <i class="bi bi-chevron-left"></i>
+        </button>
+        <span class="pag-info">{{ currentPage() }} de {{ totalPages() }}</span>
+        <button class="pag-btn" (click)="nextPage()" [disabled]="currentPage() === totalPages()">
+          <i class="bi bi-chevron-right"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL -->
+  <div class="modal-overlay" *ngIf="showModal()" (click)="cerrarModal()">
+    <div class="modal-box" (click)="$event.stopPropagation()">
+
+      <div class="modal-header">
+        <h4>{{ editando() ? 'Editar producto' : 'Registrar nuevo producto' }}</h4>
+        <button class="modal-close" (click)="cerrarModal()">
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Código de serie *</label>
+            <input type="text" [(ngModel)]="form.codigoSerie" placeholder="ej: MSO-001" class="form-input">
+          </div>
+          <div class="form-group">
+            <label>Nombre *</label>
+            <input type="text" [(ngModel)]="form.nombre" placeholder="Nombre del producto" class="form-input">
+          </div>
+          <div class="form-group">
+            <label>Categoría</label>
+            <select [(ngModel)]="form.categoria" class="form-input">
+              <option value="">Seleccionar categoría</option>
+              <option *ngFor="let cat of categorias" [value]="cat">{{cat}}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Stock mínimo *</label>
+            <input type="number" [(ngModel)]="form.stockMinimo" min="0" class="form-input">
+          </div>
+          <div class="form-group">
+            <label>Precio (S/) *</label>
+            <input type="number" [(ngModel)]="form.precio" min="0" step="0.01" class="form-input">
+          </div>
+          <div class="form-group">
+            <label>Proveedor</label>
+            <select [(ngModel)]="form.idProveedor" class="form-input">
+              <option [ngValue]="null">Sin proveedor</option>
+              <option *ngFor="let p of proveedoresQuery.data()" [ngValue]="p.id">
+                {{ p.nombre }}
+              </option>
+            </select>
+          </div>
+        </div>
+        <div class="info-note">
+          <i class="bi bi-info-circle"></i>
+          El stock inicial se carga mediante un movimiento de entrada.
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-cancel" (click)="cerrarModal()">Cancelar</button>
+        <button class="btn-promart btn btn-sm" (click)="guardarProducto()" [disabled]="guardarMutation.isPending()">
+          <span *ngIf="guardarMutation.isPending()"><i class="bi bi-arrow-repeat spin"></i> Guardando...</span>
+          <span *ngIf="!guardarMutation.isPending()">{{ editando() ? 'Guardar cambios' : 'Registrar' }}</span>
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+</div>

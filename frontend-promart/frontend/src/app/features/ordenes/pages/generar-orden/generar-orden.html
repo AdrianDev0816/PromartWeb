@@ -1,0 +1,162 @@
+<div class="page-wrapper">
+
+  <!-- ── Header ─────────────────────────────────────────────────────── -->
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">
+        <i class="bi bi-cart-plus"></i>
+        Generar Orden de Compra
+      </h1>
+      <p class="page-subtitle">
+        Tu solicitud será enviada a evaluación del Supervisor
+      </p>
+    </div>
+  </div>
+
+  <!-- ── Cargando datos de referencia ──────────────────────────────── -->
+  <div class="loading-row"
+       *ngIf="queryProveedores.isLoading() || queryProductos.isLoading()">
+    <span class="spinner"></span> Cargando proveedores y productos…
+  </div>
+
+  <ng-container *ngIf="queryProveedores.isSuccess() && queryProductos.isSuccess()">
+
+    <form class="form-card" (ngSubmit)="enviar()" #f="ngForm">
+
+      <!-- ── Datos generales ───────────────────────────────────────── -->
+      <div class="form-section">
+        <h2 class="section-title">Datos generales</h2>
+
+        <div class="fields-row">
+          <div class="form-group required">
+            <label>Proveedor</label>
+            <select [ngModel]="idProveedor()"
+                    (ngModelChange)="idProveedor.set($event ? +$event : null)"
+                    name="proveedor" required>
+              <option [value]="null">— Selecciona un proveedor —</option>
+              <option *ngFor="let p of queryProveedores.data()" [value]="p.id">
+                {{ p.nombre }}
+              </option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Fecha estimada de entrega</label>
+            <input type="date"
+                   [ngModel]="fechaEstimadaEntrega()"
+                   (ngModelChange)="fechaEstimadaEntrega.set($event)"
+                   name="fechaEntrega">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Observaciones</label>
+          <textarea rows="3"
+                    [ngModel]="observaciones()"
+                    (ngModelChange)="observaciones.set($event)"
+                    name="obs"
+                    placeholder="Ej: Reposición urgente por temporada alta…"></textarea>
+        </div>
+      </div>
+
+      <!-- ── Tabla de productos ────────────────────────────────────── -->
+      <div class="form-section">
+        <div class="section-header">
+          <h2 class="section-title">Productos a solicitar</h2>
+          <button type="button" class="btn-agregar-fila" (click)="agregarFila()">
+            <i class="bi bi-plus-lg"></i> Agregar producto
+          </button>
+        </div>
+
+        <div class="table-responsive">
+          <table class="det-table">
+            <thead>
+              <tr>
+                <th>PRODUCTO</th>
+                <th class="th-num">CANTIDAD</th>
+                <th class="th-num">PRECIO UNIT.</th>
+                <th class="th-num">SUBTOTAL</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let fila of filas(); let i = index; trackBy: trackByIdx">
+                <td>
+                  <select [value]="fila.idProducto"
+                          (change)="onProductoChange(i, $any($event.target).value)">
+                    <option [value]="null">— Selecciona —</option>
+                    <option *ngFor="let p of queryProductos.data()" [value]="p.id">
+                      {{ p.nombre }} ({{ p.codigoSerie }})
+                    </option>
+                  </select>
+                </td>
+                <td>
+                  <input type="number" min="1"
+                         [value]="fila.cantidad"
+                         (change)="onCantidadChange(i, $any($event.target).value)">
+                </td>
+                <td>
+                  <input type="number" min="0" step="0.01"
+                         [value]="fila.precioUnitario"
+                         (change)="onPrecioChange(i, $any($event.target).value)">
+                </td>
+                <td class="subtotal-cell">
+                  <strong>{{ formatMonto(subtotal(fila)) }}</strong>
+                </td>
+                <td>
+                  <button type="button" class="btn-quitar"
+                          (click)="quitarFila(i)"
+                          [disabled]="filas().length === 1"
+                          title="Quitar fila">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Total -->
+        <div class="total-row">
+          <span>TOTAL ESTIMADO</span>
+          <span class="total-monto">{{ formatMonto(total()) }}</span>
+        </div>
+      </div>
+
+      <!-- ── Error ─────────────────────────────────────────────────── -->
+      <div class="alert-error" *ngIf="error()">
+        <i class="bi bi-exclamation-circle-fill"></i> {{ error() }}
+      </div>
+
+      <!-- ── Acciones ──────────────────────────────────────────────── -->
+      <div class="form-actions">
+        <button type="button" class="btn-cancelar" routerLink="/ordenes">
+          <i class="bi bi-arrow-left"></i> Cancelar
+        </button>
+        <button type="submit" class="btn-enviar" [disabled]="mutation.isPending()">
+          <span *ngIf="!mutation.isPending()">
+            <i class="bi bi-send"></i> Enviar para evaluación
+          </span>
+          <span *ngIf="mutation.isPending()">
+            <span class="spinner-sm"></span> Enviando…
+          </span>
+        </button>
+      </div>
+
+      <!-- Nota informativa -->
+      <div class="nota-info">
+        <i class="bi bi-info-circle"></i>
+        Tu orden quedará en estado <strong>Pendiente</strong> hasta que un Supervisor la evalúe.
+      </div>
+
+    </form>
+
+  </ng-container>
+
+</div>
+
+<!-- Toast éxito -->
+<div class="toast-ok-wrap" [class.visible]="toastOk()">
+  <i class="bi bi-check-circle-fill"></i>
+  Orden enviada correctamente. Redirigiendo…
+</div>

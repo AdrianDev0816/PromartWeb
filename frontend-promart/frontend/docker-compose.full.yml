@@ -1,0 +1,53 @@
+services:
+
+  # ─── Base de datos ───────────────────────────────────
+  mysql:
+    image: mysql:8.0
+    container_name: promart-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: promart2024
+      MYSQL_DATABASE: db_inventario_promart
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-ppromart2024"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ─── Backend Spring Boot ─────────────────────────────
+  backend:
+    build:
+      context: ../../ms-inventory-management
+      dockerfile: Dockerfile
+    container_name: promart-backend
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      DB_URL: jdbc:mysql://mysql:3306/db_inventario_promart
+      DB_USERNAME: root
+      DB_PASSWORD: promart2024
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  # ─── Frontend Angular (Nginx) ────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: promart-frontend
+    restart: unless-stopped
+    ports:
+      - "4200:80"
+    depends_on:
+      - backend
+
+volumes:
+  mysql_data:
+    name: promart-mysql-data

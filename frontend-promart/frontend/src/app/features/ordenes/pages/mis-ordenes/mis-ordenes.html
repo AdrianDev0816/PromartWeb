@@ -1,0 +1,327 @@
+<div class="page-wrapper">
+
+  <!-- ── Header ─────────────────────────────────────────────────────── -->
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">
+        <i class="bi bi-clipboard2-check"></i>
+        Mis Órdenes de Compra
+      </h1>
+      <p class="page-subtitle">Historial y estado de las órdenes que generaste</p>
+    </div>
+    <a class="btn-nueva" routerLink="/ordenes/nueva">
+      <i class="bi bi-plus-lg"></i> Nueva orden
+    </a>
+  </div>
+
+  <!-- ── Loading / Error ────────────────────────────────────────────── -->
+  <div class="loading-row" *ngIf="query.isLoading()">
+    <span class="spinner"></span> Cargando tus órdenes…
+  </div>
+  <div class="alert-error" *ngIf="query.isError()">
+    <i class="bi bi-exclamation-triangle-fill"></i>
+    No se pudieron cargar las órdenes.
+  </div>
+
+  <ng-container *ngIf="query.isSuccess()">
+
+    <!-- ── Métricas ───────────────────────────────────────────────────── -->
+    <div class="metrics-row">
+      <div class="mini-card">
+        <span class="mini-num">{{ total() }}</span>
+        <span class="mini-label">Total</span>
+      </div>
+      <div class="mini-card warn">
+        <span class="mini-num">{{ pendientes() }}</span>
+        <span class="mini-label">Pendientes</span>
+      </div>
+      <div class="mini-card blue">
+        <span class="mini-num">{{ aprobadas() }}</span>
+        <span class="mini-label">Aprobadas</span>
+      </div>
+      <div class="mini-card green">
+        <span class="mini-num">{{ completadas() }}</span>
+        <span class="mini-label">Completadas</span>
+      </div>
+      <div class="mini-card danger">
+        <span class="mini-num">{{ rechazadas() }}</span>
+        <span class="mini-label">Rechaz./Cancel.</span>
+      </div>
+    </div>
+
+    <!-- ── Sin órdenes ────────────────────────────────────────────────── -->
+    <div class="empty-state" *ngIf="(query.data()?.length ?? 0) === 0">
+      <i class="bi bi-cart-x"></i>
+      <p>Aún no has generado ninguna orden de compra</p>
+      <a class="btn-nueva" routerLink="/ordenes/nueva">
+        <i class="bi bi-plus-lg"></i> Crear mi primera orden
+      </a>
+    </div>
+
+    <!-- ── Tabla ───────────────────────────────────────────────────────── -->
+    <div class="table-card" *ngIf="(query.data()?.length ?? 0) > 0">
+      <div class="table-responsive">
+        <table>
+          <thead>
+            <tr>
+              <th>N° ORDEN</th>
+              <th>FECHA</th>
+              <th>PROVEEDOR</th>
+              <th class="text-right">TOTAL</th>
+              <th>ESTADO</th>
+              <th>EVALUADO POR</th>
+              <th>OBSERVACIÓN</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let o of query.data()"
+                [class.row-pendiente]="o.estado === 'Pendiente'"
+                [class.row-rechazada]="o.estado === 'Rechazada'"
+                [class.row-completada]="o.estado === 'Completada'">
+
+              <td><strong>{{ o.numeroOrden }}</strong></td>
+
+              <td>
+                <div>{{ formatFecha(o.fechaEmision) }}</div>
+                <small class="text-muted" *ngIf="o.fechaEstimadaEntrega">
+                  Est. {{ formatFecha(o.fechaEstimadaEntrega) }}
+                </small>
+              </td>
+
+              <td>{{ o.proveedorNombre }}</td>
+
+              <td class="text-right"><strong>{{ formatMonto(o.total) }}</strong></td>
+
+              <td>
+                <div class="estado-cell">
+                  <span class="badge-estado" [ngClass]="badgeClass(o.estado)">
+                    <i class="bi" [ngClass]="iconoEstado(o.estado)"></i>
+                    <span class="pulse-dot" *ngIf="o.estado === 'Pendiente'"></span>
+                    {{ etiqueta(o.estado) }}
+                  </span>
+                  <small class="fecha-estado text-muted"
+                         *ngIf="o.estado === 'Completada' && o.fechaCompletado">
+                    {{ formatFecha(o.fechaCompletado) }}
+                  </small>
+                  <small class="fecha-estado text-muted"
+                         *ngIf="(o.estado === 'Aprobada' || o.estado === 'Rechazada') && o.fechaEvaluacion">
+                    {{ formatFecha(o.fechaEvaluacion) }}
+                  </small>
+                </div>
+              </td>
+
+              <td>
+                <span *ngIf="o.evaluadorNombre">{{ o.evaluadorNombre }}</span>
+                <span class="text-muted" *ngIf="!o.evaluadorNombre">—</span>
+              </td>
+
+              <td class="obs-col">
+                <span class="motivo-rechazo" *ngIf="o.motivoRechazo">
+                  <i class="bi bi-exclamation-circle-fill"></i>
+                  {{ o.motivoRechazo }}
+                </span>
+                <span class="text-muted" *ngIf="!o.motivoRechazo && !o.observaciones">—</span>
+                <span *ngIf="!o.motivoRechazo && o.observaciones" class="obs-text">
+                  {{ o.observaciones }}
+                </span>
+              </td>
+
+              <td class="acciones-col">
+                <button class="btn-ver-detalle" (click)="abrirModal(o)" title="Ver detalle completo">
+                  <i class="bi bi-eye"></i> Ver
+                </button>
+                <button class="btn-recepcion"
+                        *ngIf="o.estado === 'Aprobada'"
+                        [disabled]="confirmandoId() === o.id"
+                        (click)="confirmarRecepcion(o)"
+                        title="Confirmar recepción y actualizar stock">
+                  <i class="bi"
+                     [class.bi-box-arrow-in-down]="confirmandoId() !== o.id"
+                     [class.bi-arrow-repeat]="confirmandoId() === o.id"></i>
+                  {{ confirmandoId() === o.id ? 'Registrando…' : 'Confirmar recepción' }}
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="ws-indicator">
+      <span class="ws-dot"></span>
+      Actualizaciones en tiempo real activas
+    </div>
+
+  </ng-container>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- MODAL DE DETALLE                                                   -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" [class.active]="modalOrden()" (click)="cerrarModal()"></div>
+
+<div class="modal-box" [class.active]="modalOrden()" role="dialog" aria-modal="true">
+  <ng-container *ngIf="modalOrden() as o">
+
+    <!-- Header modal -->
+    <div class="modal-header">
+      <div class="modal-titulo">
+        <strong>{{ o.numeroOrden }}</strong>
+        <span class="badge-estado" [ngClass]="badgeClass(o.estado)">
+          <i class="bi" [ngClass]="iconoEstado(o.estado)"></i>
+          <span class="pulse-dot" *ngIf="o.estado === 'Pendiente'"></span>
+          {{ etiqueta(o.estado) }}
+        </span>
+      </div>
+      <button class="modal-cerrar" (click)="cerrarModal()" aria-label="Cerrar">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+
+    <!-- Cadena de responsables -->
+    <div class="modal-section cadena-section">
+      <p class="modal-section-title">CADENA DE RESPONSABLES</p>
+      <div class="cadena-row">
+
+        <div class="cadena-item">
+          <span class="cadena-rol">SOLICITANTE</span>
+          <div class="cadena-persona">
+            <div class="cadena-avatar">{{ o.trabajadorNombre.charAt(0) }}</div>
+            <div>
+              <div class="cadena-nombre">{{ o.trabajadorNombre }}</div>
+              <small class="cadena-cargo">{{ o.trabajadorCargo }}</small>
+            </div>
+          </div>
+        </div>
+
+        <div class="cadena-flecha"><i class="bi bi-arrow-right"></i></div>
+
+        <div class="cadena-item">
+          <span class="cadena-rol">EVALUADOR</span>
+          <div class="cadena-persona" *ngIf="o.evaluadorNombre">
+            <div class="cadena-avatar supervisor">{{ o.evaluadorNombre.charAt(0) }}</div>
+            <div>
+              <div class="cadena-nombre">{{ o.evaluadorNombre }}</div>
+              <small class="cadena-cargo">Supervisor / Admin</small>
+            </div>
+          </div>
+          <div class="cadena-pendiente" *ngIf="!o.evaluadorNombre">
+            <i class="bi bi-hourglass-split"></i>
+            <span>Pendiente de evaluación</span>
+          </div>
+        </div>
+
+        <div class="cadena-flecha" *ngIf="o.estado === 'Completada'">
+          <i class="bi bi-arrow-right"></i>
+        </div>
+
+        <div class="cadena-item" *ngIf="o.estado === 'Completada'">
+          <span class="cadena-rol">COMPLETADO</span>
+          <div class="cadena-persona">
+            <div class="cadena-avatar admin">
+              <i class="bi bi-check2-all"></i>
+            </div>
+            <div>
+              <div class="cadena-nombre">Stock actualizado</div>
+              <small class="cadena-cargo">{{ formatFecha(o.fechaCompletado) }}</small>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Info general -->
+    <div class="modal-section">
+      <p class="modal-section-title">INFORMACIÓN GENERAL</p>
+      <div class="info-grid">
+        <div class="info-item">
+          <span class="info-label">Proveedor</span>
+          <span class="info-val">{{ o.proveedorNombre }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Fecha emisión</span>
+          <span class="info-val">{{ formatFecha(o.fechaEmision) }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Entrega estimada</span>
+          <span class="info-val">{{ formatFecha(o.fechaEstimadaEntrega) }}</span>
+        </div>
+        <div class="info-item" *ngIf="o.fechaEvaluacion">
+          <span class="info-label">Fecha evaluación</span>
+          <span class="info-val">{{ formatFecha(o.fechaEvaluacion) }}</span>
+        </div>
+        <div class="info-item" *ngIf="o.fechaCompletado">
+          <span class="info-label">Fecha completado</span>
+          <span class="info-val">{{ formatFecha(o.fechaCompletado) }}</span>
+        </div>
+        <div class="info-item" *ngIf="o.observaciones">
+          <span class="info-label">Observaciones</span>
+          <span class="info-val">{{ o.observaciones }}</span>
+        </div>
+        <div class="info-item" *ngIf="o.motivoRechazo">
+          <span class="info-label">Motivo rechazo</span>
+          <span class="info-val text-danger">{{ o.motivoRechazo }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabla de productos -->
+    <div class="modal-section">
+      <p class="modal-section-title">PRODUCTOS SOLICITADOS ({{ o.cantidadProductos }} ítems)</p>
+      <table class="det-table">
+        <thead>
+          <tr>
+            <th>PRODUCTO</th>
+            <th class="text-right">CANT.</th>
+            <th class="text-right">PRECIO UNIT.</th>
+            <th class="text-right">SUBTOTAL</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let d of o.detalles">
+            <td>
+              <div>{{ d.productoNombre }}</div>
+              <small class="text-muted">{{ d.productoCodigoSerie }}</small>
+            </td>
+            <td class="text-right">{{ d.cantidad }}</td>
+            <td class="text-right">{{ formatMonto(d.precioUnitario) }}</td>
+            <td class="text-right"><strong>{{ formatMonto(d.subtotal) }}</strong></td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="3" class="text-right"><strong>TOTAL</strong></td>
+            <td class="text-right total-det">{{ formatMonto(o.total) }}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn-recepcion-modal"
+              *ngIf="modalOrden()?.estado === 'Aprobada'"
+              [disabled]="confirmandoId() === modalOrden()?.id"
+              (click)="confirmarRecepcion(modalOrden()!)">
+        <i class="bi"
+           [class.bi-box-arrow-in-down]="confirmandoId() !== modalOrden()?.id"
+           [class.bi-arrow-repeat]="confirmandoId() === modalOrden()?.id"></i>
+        {{ confirmandoId() === modalOrden()?.id ? 'Registrando al inventario…' : 'Confirmar recepción y actualizar stock' }}
+      </button>
+      <button class="btn-cerrar-modal" (click)="cerrarModal()">Cerrar</button>
+    </div>
+
+  </ng-container>
+</div>
+
+<!-- Toast -->
+<div class="toast-recep"
+     [class.toast-visible]="toastVisible()"
+     [class.toast-ok]="toastOk()"
+     [class.toast-err]="!toastOk()">
+  <i class="bi"
+     [class.bi-check-circle-fill]="toastOk()"
+     [class.bi-x-circle-fill]="!toastOk()"></i>
+  {{ toastMsg() }}
+</div>
